@@ -46,38 +46,52 @@ jobs:
       - name: Move cache
         run: rm -rf /tmp/.buildx-cache && mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
-      # ── 5. 导出镜像为 tar.gz ────────────────────────────────
-      - name: Export image to tar
+      # ── 5. 导出镜像为 tar.gz + 写入 .env 到本地文件 ────────
+      - name: Export image and prepare files
         run: |
           docker save ai-app:latest | gzip > /tmp/ai-app.tar.gz
           echo "IMAGE_SIZE=$(du -sh /tmp/ai-app.tar.gz | cut -f1)" >> $GITHUB_STEP_SUMMARY
+          # 将 APP_ENV 写入本地文件（避免通过 SSH 参数传递导致解析错误）
+          cat > /tmp/app.env << 'ENVEOF'
+          ${{ secrets.APP_ENV }}
+          ENVEOF
+          echo ".env 已准备好"
 
-      # ── 6. 安装 SSH Key + 用 rsync 传输镜像 + 部署 ─────────
-      - name: Deploy to ECS via SSH (rsync)
+      # ── 6. 安装 SSH Key ──────────────────────────────────────
+      - name: Setup SSH key
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > /tmp/ssh_key
+          chmod 600 /tmp/ssh_key
+
+      # ── 7. 写入 .env 到服务器（独立步骤）─────────────────────
+      - name: Write .env to ECS via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          source: "/tmp/app.env"
+          target: "/root/deploy/.env"
+          overwrite: true
+
+      # ── 8. rsync 传输镜像 + 远程部署容器（独立步骤）─────────
+      - name: Deploy image and start container
         env:
           HOST: ${{ secrets.SSH_HOST }}
           PORT: ${{ secrets.SSH_PORT || '22' }}
           USER: ${{ secrets.SSH_USERNAME }}
-          KEY_PATH: /tmp/ssh_key
         run: |
           set -e
-
-          # ---- 写入 SSH 私钥 ----
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ${KEY_PATH}
-          chmod 600 ${KEY_PATH}
-
-          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p ${PORT} -i ${KEY_PATH}"
+          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p ${PORT} -i /tmp/ssh_key"
 
           echo "========================================"
           echo "  开始部署 AI App — $(date '+%Y-%m-%d %H:%M:%S')"
           echo "========================================"
 
-          # ---- 在服务器上创建目录并写入 .env ----
-          ssh ${SSH_OPTS} ${USER}@${HOST} "mkdir -p /root/deploy/data /root/deploy/uploads && cat > /root/deploy/.env << 'ENVEOF'
-          ${{ secrets.APP_ENV }}
-          ENVEOF
-          "
-          echo "✅ .env 已写入"
+          # ---- 在服务器上创建目录 ----
+          ssh ${SSH_OPTS} ${USER}@${HOST} "mkdir -p /root/deploy/data /root/deploy/uploads"
+          echo "✅ 目录已创建"
 
           # ---- 用 rsync 通过 SSH 传输 tar 文件 ----
           echo "📤 传输镜像到 ECS..."
@@ -86,18 +100,14 @@ jobs:
           # ---- 远程加载镜像并部署容器 ----
           ssh ${SSH_OPTS} ${USER}@${HOST} '
             set -e
-
-            # 加载新镜像
             echo "📦 加载 Docker 镜像..."
             docker load < /root/deploy/ai-app.tar.gz
             rm -f /root/deploy/ai-app.tar.gz
 
-            # 停止旧容器
             echo "🛑 停止旧容器..."
             docker stop ai-app 2>/dev/null || true
             docker rm   ai-app 2>/dev/null || true
 
-            # 启动新容器
             echo "🚀 启动新容器..."
             docker run -d \
               --name ai-app \
@@ -108,11 +118,9 @@ jobs:
               -v /root/deploy/uploads:/app/server/uploads \
               ai-app:latest
 
-            # 清理旧镜像
             echo "🧹 清理旧镜像..."
             docker image prune -f
 
-            # 健康检查
             echo "⏳ 等待服务就绪..."
             sleep 5
             for i in 1 2 3 4 5; do
@@ -131,5 +139,4 @@ jobs:
             echo "========================================"
           '
 
-          # 清理本地私钥
-          rm -f ${KEY_PATH}
+          rm -f /tmp/ssh_key
