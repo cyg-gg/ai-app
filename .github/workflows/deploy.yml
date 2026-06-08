@@ -19,14 +19,14 @@ jobs:
         uses: actions/checkout@v4
 
       # 2. 配置 SSH 密钥
-      - name: Setup SSH Key
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
-          echo "SSH key setup complete"
-          ssh -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} "echo 'SSH connection successful'"
+          # 跳过主机密钥检查
+          echo -e "Host *\n\tStrictHostKeyChecking no\n\tUserKnownHostsFile /dev/null" > ~/.ssh/config
+          chmod 600 ~/.ssh/config
 
       # 3. 打包并传输代码到 ECS
       - name: Transfer code to ECS
@@ -46,8 +46,7 @@ jobs:
           tar -czf ai-app.tar.gz ai-app-deploy/
 
           # 传输到 ECS
-          scp -i ~/.ssh/id_ed25519 -o StrictHostKeyChecking=no /tmp/ai-app.tar.gz ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/root/ai-app.tar.gz
-          echo "Code transferred successfully"
+          scp /tmp/ai-app.tar.gz ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/root/ai-app.tar.gz
 
       # 4. SSH 登录 ECS，解压代码、构建 Docker 镜像并启动容器
       - name: Build and run Docker on ECS
@@ -90,11 +89,11 @@ jobs:
               ai-app:latest
 
             # 清理旧镜像和构建缓存
-            echo "🧹 清理..."
+            echo " 清理..."
             docker image prune -f
             docker builder prune -f
 
             # 检查容器状态
             echo "✅ 部署完成！"
             docker ps --filter name=ai-app --format "容器状态: {{.Status}}"
-            echo "🌐 访问地址: http://${{ secrets.SSH_HOST }}:3000"
+            echo " 访问地址: http://${{ secrets.SSH_HOST }}:3000"
