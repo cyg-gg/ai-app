@@ -26,7 +26,7 @@ RUN npm install -g pm2
 # ---- 后端 ----
 # 先复制依赖文件，利用 Docker 缓存
 COPY server/package*.json ./server/
-RUN cd server && npm ci --omit=dev
+RUN cd server && npm ci --omit=dev --legacy-peer-deps
 
 # 复制后端源码
 COPY server/ ./server/
