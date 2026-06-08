@@ -1,6 +1,7 @@
 # ============================================================
 # GitHub Actions — 自动构建 Docker 镜像并部署到阿里云 ECS
 # 策略：CI 构建 → docker save → rsync(over SSH) 传输到 ECS → docker load 启动
+# 注意：全程只用 ssh/rsync 原生命令，不使用 appleboy/scp-action
 # ============================================================
 
 name: Deploy to Alibaba Cloud ECS
@@ -46,69 +47,57 @@ jobs:
       - name: Move cache
         run: rm -rf /tmp/.buildx-cache && mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
-      # ── 5. 导出镜像为 tar.gz + 写入 .env 到本地文件 ────────
-      - name: Export image and prepare files
+      # ── 5. 导出镜像 + 准备 .env 文件 ───────────────────────
+      - name: Export and prepare files
         run: |
           docker save ai-app:latest | gzip > /tmp/ai-app.tar.gz
           echo "IMAGE_SIZE=$(du -sh /tmp/ai-app.tar.gz | cut -f1)" >> $GITHUB_STEP_SUMMARY
-          # 将 APP_ENV 写入本地文件（避免通过 SSH 参数传递导致解析错误）
-          cat > /tmp/app.env << 'ENVEOF'
-          ${{ secrets.APP_ENV }}
-          ENVEOF
-          echo ".env 已准备好"
+          echo "${{ secrets.APP_ENV }}" > /tmp/app.env
+          echo ".env 文件已准备好"
 
-      # ── 6. 安装 SSH Key ──────────────────────────────────────
-      - name: Setup SSH key
-        run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > /tmp/ssh_key
-          chmod 600 /tmp/ssh_key
-
-      # ── 7. 写入 .env 到服务器（独立步骤）─────────────────────
-      - name: Write .env to ECS via SCP
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || '22' }}
-          source: "/tmp/app.env"
-          target: "/root/deploy/.env"
-          overwrite: true
-
-      # ── 8. rsync 传输镜像 + 远程部署容器（独立步骤）─────────
-      - name: Deploy image and start container
+      # ── 6. 全部部署操作（SSH 原生命令）──────────────────────
+      - name: Full Deploy via SSH
         env:
           HOST: ${{ secrets.SSH_HOST }}
           PORT: ${{ secrets.SSH_PORT || '22' }}
           USER: ${{ secrets.SSH_USERNAME }}
+          PRIV_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
           set -e
-          SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p ${PORT} -i /tmp/ssh_key"
+
+          # ---- 写入 SSH 私钥 ----
+          mkdir -p ~/.ssh
+          echo "$PRIV_KEY" | tr -d '\r' > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          export SSH_CMD="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p $PORT -i ~/.ssh/deploy_key"
 
           echo "========================================"
           echo "  开始部署 AI App — $(date '+%Y-%m-%d %H:%M:%S')"
           echo "========================================"
 
-          # ---- 在服务器上创建目录 ----
-          ssh ${SSH_OPTS} ${USER}@${HOST} "mkdir -p /root/deploy/data /root/deploy/uploads"
-          echo "✅ 目录已创建"
+          # ---- 步骤A：创建目录 ----
+          echo "[1/4] 创建目录..."
+          $SSH_CMD $USER@$HOST 'mkdir -p /root/deploy/data /root/deploy/uploads'
 
-          # ---- 用 rsync 通过 SSH 传输 tar 文件 ----
-          echo "📤 传输镜像到 ECS..."
-          rsync -avz -e "ssh ${SSH_OPTS}" /tmp/ai-app.tar.gz ${USER}@${HOST}:/root/deploy/ai-app.tar.gz
+          # ---- 步骤B：传输 .env 文件 ----
+          echo "[2/4] 传输 .env..."
+          scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+            -P $PORT -i ~/.ssh/deploy_key \
+            /tmp/app.env $USER@$HOST:/root/deploy/.env
 
-          # ---- 远程加载镜像并部署容器 ----
-          ssh ${SSH_OPTS} ${USER}@${HOST} '
+          # ---- 步骤C：传输镜像 tar ----
+          echo "[3/4] 传输镜像 (rsync)..."
+          rsync -avz \
+            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p $PORT -i ~/.ssh/deploy_key" \
+            /tmp/ai-app.tar.gz $USER@$HOST:/root/deploy/ai-app.tar.gz
+
+          # ---- 步骤D：加载镜像并启动容器 ----
+          echo "[4/4] 加载镜像并部署容器..."
+          $SSH_CMD $USER@$HOST '
             set -e
-            echo "📦 加载 Docker 镜像..."
-            docker load < /root/deploy/ai-app.tar.gz
-            rm -f /root/deploy/ai-app.tar.gz
-
-            echo "🛑 停止旧容器..."
+            docker load < /root/deploy/ai-app.tar.gz && rm -f /root/deploy/ai-app.tar.gz
             docker stop ai-app 2>/dev/null || true
             docker rm   ai-app 2>/dev/null || true
-
-            echo "🚀 启动新容器..."
             docker run -d \
               --name ai-app \
               --restart unless-stopped \
@@ -117,26 +106,20 @@ jobs:
               -v /root/deploy/data:/app/server/data \
               -v /root/deploy/uploads:/app/server/uploads \
               ai-app:latest
-
-            echo "🧹 清理旧镜像..."
             docker image prune -f
-
-            echo "⏳ 等待服务就绪..."
             sleep 5
             for i in 1 2 3 4 5; do
-              STATUS=$(curl -sf http://localhost:3000/health 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get(\"status\",\"pending\"))" 2>/dev/null || echo "pending")
-              if [ "$STATUS" = "ok" ]; then
-                echo "✅ 健康检查通过！服务已就绪"
-                break
-              fi
-              echo "  第 $i 次... 等待 3s"
+              STATUS=$(curl -sf http://localhost:3000/health 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get(\"status\",\"pending\"))" 2>/dev/null || echo "pending")
+              if [ "$STATUS" = "ok" ]; then echo "✅ 健康检查通过！"; break; fi
               sleep 3
             done
-
-            echo "========================================"
-            echo "  部署完成！"
             docker ps --filter name=ai-app --format "{{.Names}} | {{.Status}} | {{.Ports}}"
-            echo "========================================"
           '
 
-          rm -f /tmp/ssh_key
+          # ---- 清理私钥 ----
+          rm -f ~/.ssh/deploy_key
+
+          echo "========================================"
+          echo "  部署完成！"
+          echo "  访问地址: http://${HOST}:3000"
+          echo "========================================"
