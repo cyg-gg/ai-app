@@ -1,8 +1,5 @@
 # ============================================================
-# GitHub Actions — 自动部署到阿里云 ECS（免 Docker Hub）
-#
-# 触发条件：推送 main 分支
-# 流程：代码传到 ECS → 直接在服务器上构建镜像 → 重启容器
+# GitHub Actions — 自动部署到阿里云 ECS
 # ============================================================
 
 name: Deploy to Alibaba Cloud ECS
@@ -21,50 +18,47 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. 打包代码并传输到 ECS
-      - name: Transfer code to ECS
-        uses: appleboy/scp-action@v0.1.7
+      # 2. 设置 SSH Agent
+      - name: Setup SSH Agent
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || '22' }}
-          source: "."
-          target: "/root/ai-app-tmp"
-          strip_components: 0
-          rm: true
-          debug: true
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      # 3. SSH 登录 ECS，移动代码、构建 Docker 镜像并启动容器
-      - name: Build and run Docker on ECS
-        uses: appleboy/ssh-action@v1.1.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || '22' }}
-          script: |
+      # 3. 添加主机密钥并测试连接
+      - name: Test SSH Connection
+        run: |
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} "echo 'SSH connection successful!'"
+
+      # 4. 打包并传输代码
+      - name: Transfer code
+        run: |
+          tar -czf /tmp/ai-app.tar.gz \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='dist' \
+            --exclude='.env' \
+            --exclude='server/data' \
+            .
+          scp /tmp/ai-app.tar.gz ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/root/ai-app.tar.gz
+
+      # 5. 在 ECS 上部署
+      - name: Deploy
+        run: |
+          ssh ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} << 'ENDSSH'
             set -e
-
-            echo "🚀 开始部署 AI Studio..."
-
-            # 移动代码到目标目录
-            echo "📦 移动代码..."
+            echo "🚀 开始部署..."
             rm -rf /root/ai-app
-            mv /root/ai-app-tmp /root/ai-app
+            mkdir -p /root/ai-app
+            tar -xzf /root/ai-app.tar.gz -C /root/ai-app
+            rm -f /root/ai-app.tar.gz
             cd /root/ai-app
-
-            # 停止并删除旧容器
-            echo "🛑 停止旧容器..."
+            
             docker stop ai-app 2>/dev/null || true
             docker rm ai-app 2>/dev/null || true
-
-            # 构建新镜像
-            echo "🐳 构建 Docker 镜像..."
+            
             docker build -t ai-app:latest .
-
-            # 启动新容器
-            echo "🐳 启动新容器..."
+            
             docker run -d \
               --name ai-app \
               --restart unless-stopped \
@@ -72,13 +66,10 @@ jobs:
               --env-file /root/ai-app/.env \
               -v /root/ai-app/data:/app/server/data \
               ai-app:latest
-
-            # 清理旧镜像和构建缓存
-            echo "🧹 清理..."
+            
             docker image prune -f
             docker builder prune -f
-
-            # 检查容器状态
+            
             echo "✅ 部署完成！"
-            docker ps --filter name=ai-app --format "容器状态: {{.Status}}"
-            echo "🌐 访问地址: http://${{ secrets.SSH_HOST }}:3000"
+            docker ps --filter name=ai-app
+          ENDSSH
