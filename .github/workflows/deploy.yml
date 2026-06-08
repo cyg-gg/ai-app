@@ -1,3 +1,8 @@
+# ============================================================
+# GitHub Actions — 自动构建 Docker 镜像并部署到阿里云 ECS
+# 策略：在 CI runner 上构建镜像 → 导出 tar → SCP 传输到 ECS → 远程加载并启动
+# ============================================================
+
 name: Deploy to Alibaba Cloud ECS
 
 on:
@@ -10,64 +15,131 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # ── 1. 检出代码 ──────────────────────────────────────────
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup SSH Key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY_B64 }}" | base64 -d > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+      # ── 2. 设置 Docker Buildx（加速多阶段构建）───────────────
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Create deploy script
-        run: |
-          cat > /tmp/deploy.sh << 'SCRIPT'
-          #!/bin/bash
-          set -e
-          echo "开始部署 AI Studio..."
-          echo "解压代码..."
-          rm -rf /root/ai-app
-          mkdir -p /root/ai-app
-          tar -xzf /root/ai-app.tar.gz -C /root/ai-app
-          rm -f /root/ai-app.tar.gz
-          cd /root/ai-app
-          echo "停止旧容器..."
-          docker stop ai-app 2>/dev/null || true
-          docker rm ai-app 2>/dev/null || true
-          echo "构建 Docker 镜像..."
-          docker build -t ai-app:latest .
-          echo "启动新容器..."
-          docker run -d --name ai-app --restart unless-stopped -p 3000:3000 --env-file /root/ai-app/.env -v /root/ai-app/data:/app/server/data ai-app:latest
-          echo "清理..."
-          docker image prune -f
-          docker builder prune -f
-          echo "部署完成！"
-          docker ps --filter name=ai-app --format "容器状态: {{.Status}}"
-          SCRIPT
-          chmod +x /tmp/deploy.sh
+      # ── 3. 缓存 Docker 层（加速二次构建）────────────────────
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
 
-      - name: Transfer deploy script to ECS
-        run: |
-          scp -i ~/.ssh/id_ed25519 -P ${{ secrets.SSH_PORT || '22' }} /tmp/deploy.sh ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/root/deploy.sh
+      # ── 4. 构建 Docker 镜像（在 CI 机器上）──────────────────
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ai-app:latest
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new,mode=max
 
-      - name: Package code
+      # 防止缓存无限增长
+      - name: Move cache
         run: |
-          tar -czf /tmp/ai-app.tar.gz \
-            --exclude='.git' \
-            --exclude='node_modules' \
-            --exclude='dist' \
-            --exclude='server/data' \
-            .
-          ls -lh /tmp/ai-app.tar.gz
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
-      - name: Transfer code to ECS
+      # ── 5. 导出镜像为 tar 包 ─────────────────────────────────
+      - name: Export image to tar
         run: |
-          scp -i ~/.ssh/id_ed25519 -P ${{ secrets.SSH_PORT || '22' }} /tmp/ai-app.tar.gz ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/root/ai-app.tar.gz
+          docker save ai-app:latest | gzip > /tmp/ai-app.tar.gz
+          echo "镜像大小: $(du -sh /tmp/ai-app.tar.gz | cut -f1)"
 
-      - name: Run deploy on ECS
-        run: |
-          ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.SSH_PORT || '22' }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} "bash /root/deploy.sh"
+      # ── 6. SCP 传输镜像到 ECS ────────────────────────────────
+      - name: Upload image to ECS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          source: /tmp/ai-app.tar.gz
+          target: /root/deploy/
+          strip_components: 2
 
-      - name: Show access URL
-        run: echo "部署完成！访问地址: http://${{ secrets.SSH_HOST }}:3000"
+      # ── 7. 上传 .env 环境变量文件到 ECS ─────────────────────
+      #    （首次部署后 .env 不会变动，此步骤幂等）
+      - name: Write .env file to ECS
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            mkdir -p /root/deploy
+            cat > /root/deploy/.env << 'ENVEOF'
+            ${{ secrets.APP_ENV }}
+            ENVEOF
+            echo ".env 文件已写入"
+
+      # ── 8. 远程：加载镜像并重启容器 ─────────────────────────
+      - name: Deploy on ECS
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            set -e
+            echo "========================================"
+            echo "  开始部署 AI App — $(date '+%Y-%m-%d %H:%M:%S')"
+            echo "========================================"
+
+            # 创建持久化数据目录（首次自动创建）
+            mkdir -p /root/deploy/data /root/deploy/uploads
+
+            # 加载新镜像
+            echo "📦 加载 Docker 镜像..."
+            docker load < /root/deploy/ai-app.tar.gz
+            rm -f /root/deploy/ai-app.tar.gz
+
+            # 停止并删除旧容器（忽略不存在的错误）
+            echo "🛑 停止旧容器..."
+            docker stop ai-app 2>/dev/null || true
+            docker rm   ai-app 2>/dev/null || true
+
+            # 启动新容器
+            echo "🚀 启动新容器..."
+            docker run -d \
+              --name ai-app \
+              --restart unless-stopped \
+              -p 3000:3000 \
+              --env-file /root/deploy/.env \
+              -v /root/deploy/data:/app/server/data \
+              -v /root/deploy/uploads:/app/server/uploads \
+              ai-app:latest
+
+            # 清理旧镜像（保留最新的一层，节省磁盘）
+            echo "🧹 清理旧镜像..."
+            docker image prune -f
+
+            # 健康检查（等待容器启动）
+            echo "⏳ 等待服务就绪..."
+            sleep 5
+            for i in 1 2 3 4 5; do
+              STATUS=$(curl -sf http://localhost:3000/health | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status','unknown'))" 2>/dev/null || echo "pending")
+              if [ "$STATUS" = "ok" ]; then
+                echo "✅ 健康检查通过！服务已就绪"
+                break
+              fi
+              echo "  第 $i 次检查未就绪，等待 3s..."
+              sleep 3
+            done
+
+            echo "========================================"
+            echo "  部署完成！"
+            docker ps --filter name=ai-app --format "容器: {{.Names}} | 状态: {{.Status}} | 端口: {{.Ports}}"
+            echo "  访问地址: http://${{ secrets.SSH_HOST }}:3000"
+            echo "========================================"
