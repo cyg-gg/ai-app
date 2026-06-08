@@ -1,0 +1,129 @@
+.agent-task {
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-2);
+  transition: border-color 0.2s, transform 0.2s;
+}
+.agent-task--running { border-color: color-mix(in srgb, var(--accent-2) 70%, var(--border-color)); }
+.agent-task--done    { border-color: #34d399; }
+.agent-task--error   { border-color: #f87171; }
+
+/* 任务头 */
+.task__header {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  align-items: flex-start;
+}
+.task__status-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+.task__info { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.task__input { font-size: 14px; color: var(--text-primary); font-weight: 500; }
+
+.task__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.task__badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+.badge--running { background: color-mix(in srgb, var(--accent-2) 20%, var(--surface-2)); color: var(--accent-2); }
+.badge--done    { background: color-mix(in srgb, #34d399 18%, var(--surface-2)); color: #34d399; }
+.badge--error   { background: color-mix(in srgb, #f87171 16%, var(--surface-2)); color: #f87171; }
+
+.task__time { font-size: 11px; color: var(--text-secondary); }
+.task__steps-btn {
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 2px 8px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.task__steps-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* 步骤 */
+.task__steps {
+  border-top: 1px solid var(--border-color);
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.step {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.step__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  background: var(--panel-bg);
+  user-select: none;
+  transition: background 0.15s;
+}
+.step__header:hover { background: color-mix(in srgb, var(--accent) 8%, var(--panel-bg)); }
+
+.step__index {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--border-color);
+  color: var(--text-secondary);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.step__icon { font-size: 14px; }
+.step__tool { color: var(--accent-2); font-weight: 600; flex-shrink: 0; }
+.step__input {
+  color: var(--text-secondary);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.step__toggle { color: var(--text-secondary); font-size: 10px; margin-left: auto; flex-shrink: 0; }
+
+.step__result {
+  border-top: 1px solid var(--border-color);
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--bg) 96%, black);
+}
+.step__result pre {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'Fira Code', monospace;
+  line-height: 1.6;
+}
+
+/* 输出 */
+.task__output {
+  border-top: 1px solid var(--border-color);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.output__label  { font-size: 12px; color: #34d399; font-weight: 600; }
+.output__content {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.75;
+  white-space: pre-wrap;
+}

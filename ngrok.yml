@@ -1,0 +1,9 @@
+version: "3"
+agent:
+  authtoken: 3EWfbOuTeZCGnybPVWCc5HJ8W6T_4hGZiU9KGagygtJiCQ1UT
+
+tunnels:
+  server:
+    proto: http
+    addr: 3000
+    name: server-tunnel

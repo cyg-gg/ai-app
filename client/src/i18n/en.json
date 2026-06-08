@@ -1,0 +1,149 @@
+{
+  "app": {
+    "title": "AI Assistant",
+    "tabs": {
+      "chat": "Chat",
+      "rag": "Knowledge Base",
+      "agent": "Agent",
+      "group": "Group Chat"
+    }
+  },
+  "chat": {
+    "placeholder": "How can I help you?",
+    "regenerate": "Regenerate",
+    "clear": "Clear Chat",
+    "share": "Share Chat",
+    "liveShare": "Live Share",
+    "shareNotice": "This conversation is now in live share mode. New messages will be synced to the shared page.",
+    "shareFailed": "Share failed",
+    "linkCopied": "Link copied",
+    "shareTitle": "Share this conversation",
+    "empty": "Start a new conversation",
+    "toolbar": {
+      "tip": "Enter to send · Shift+Enter for new line",
+      "count": "chars"
+    }
+  },
+  "agent": {
+    "description": "Agent will automatically use tools to search, calculate, and check weather",
+    "suggestionLabel": "Try these tasks",
+    "clear": "Clear Records",
+    "placeholder": "Describe your task, Agent will execute it step by step...",
+    "status": {
+      "running": "Running",
+      "done": "Done",
+      "error": "Error"
+    },
+    "steps": "steps",
+    "conclusion": "Conclusion",
+    "suggestions": {
+      "0": "Search for the latest AI industry news",
+      "1": "What's the weather in Beijing today",
+      "2": "Calculate 3.14 * 25.6",
+      "3": "Search for Dragon Boat Festival 2026 holiday schedule",
+      "4": "Help me calculate (85 + 37) * 2.5",
+      "5": "Check the weather in Shanghai"
+    }
+  },
+  "rag": {
+    "title": "Knowledge Base Q&A",
+    "description": "After uploading documents, AI will answer questions based on document content",
+    "upload": "Upload Document",
+    "search": "Search",
+    "placeholder": "Ask questions based on knowledge base...",
+    "empty": "No documents yet, please upload first",
+    "clear": "Clear Documents",
+    "qaTab": "Q&A",
+    "manageTab": "Manage Knowledge Base",
+    "currentStore": "Current Knowledge Base",
+    "noStores": "No knowledge bases",
+    "refreshList": "Refresh list",
+    "addContent": "Add Knowledge Base Content",
+    "storeName": "Knowledge Base Name",
+    "uploadFile": "Upload File",
+    "supportPdf": "Supports PDF format",
+    "processing": "Processing...",
+    "selectFile": "Select File",
+    "importFromUrl": "Import from URL",
+    "importing": "Importing...",
+    "import": "Import",
+    "createdStores": "Created Knowledge Bases",
+    "noStoresYet": "No knowledge bases yet, please add content first",
+    "use": "Use",
+    "uploadSuccess": "File",
+    "uploadedTo": "added to knowledge base",
+    "chunks": "total",
+    "fragments": "fragments",
+    "uploadFailed": "Upload failed",
+    "urlAdded": "Web page added to knowledge base"
+  },
+  "groupChat": {
+    "title": "Real-time Group Chat",
+    "roomManagement": "Room Management",
+    "newRoom": "New Room Name",
+    "create": "Create",
+    "rename": "Rename",
+    "delete": "Delete",
+    "noRooms": "No rooms yet",
+    "selectRoom": "Please select a room to start chatting",
+    "currentRoom": "Current Room",
+    "realtime": "Connected in real-time",
+    "polling": "Polling fallback",
+    "toolbar": {
+      "tip": "Enter to send · Send @AI your question to summon AI reply",
+      "status": "Real-time"
+    },
+    "placeholder": "Type a message, @AI your question...",
+    "ai": "AI",
+    "me": "Me",
+    "renamePrompt": "Enter new room name"
+  },
+  "theme": {
+    "light": "Light",
+    "dark": "Dark",
+    "blue": "Blue",
+    "purple": "Purple",
+    "green": "Green"
+  },
+  "share": {
+    "title": "Share Conversation",
+    "copyLink": "Copy Link",
+    "close": "Close",
+    "description": "Share this link with others so they can view the conversation",
+    "loadFailed": "Failed to load shared data",
+    "loading": "Loading shared content...",
+    "unavailable": "Share unavailable",
+    "noContent": "No shared content",
+    "readonly": "Read-only share",
+    "createdAt": "Created at",
+    "backHome": "Back to Home",
+    "readonlyNotice": "This page is for viewing shared content only. Editing or sending messages is not supported."
+  },
+  "liveShare": {
+    "title": "Live Share",
+    "description": "Share your conversation in real-time, others can see new messages as they arrive",
+    "create": "Create Share",
+    "stop": "Stop Sharing",
+    "waiting": "Waiting for messages...",
+    "sharedBy": "Shared by",
+    "linkCopied": "Link copied",
+    "realtime": "Connected in real-time",
+    "polling": "Polling fallback",
+    "sameSession": "You and the other party see the same session",
+    "copyLink": "Copy Live Link",
+    "backHome": "Back to Home",
+    "liveUrl": "Live Share URL",
+    "toolbarTip": "Live shared session · Both parties can send messages",
+    "placeholder": "Type a message..."
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit"
+  }
+}

@@ -1,0 +1,82 @@
+# ============================================================
+# GitHub Actions — 自动部署到阿里云 ECS（免 Docker Hub）
+#
+# 触发条件：推送 main 分支
+# 流程：代码传到 ECS → 直接在服务器上构建镜像 → 重启容器
+# ============================================================
+
+name: Deploy to Alibaba Cloud ECS
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 检出代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. 将代码通过 rsync 传到 ECS
+      - name: Sync code to ECS
+        uses: easingthemes/ssh-deploy@main
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          REMOTE_HOST: ${{ secrets.SSH_HOST }}
+          REMOTE_USER: ${{ secrets.SSH_USERNAME }}
+          REMOTE_PORT: ${{ secrets.SSH_PORT || '22' }}
+          SOURCE: .
+          TARGET: /root/ai-app
+          EXCLUDE: |
+            .git/
+            **/node_modules/
+            **/dist/
+            .env
+            server/data/
+
+      # 3. SSH 登录 ECS，构建 Docker 镜像并启动容器
+      - name: Build and run Docker on ECS
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          script: |
+            set -e
+
+            echo "🚀 开始部署 AI Studio..."
+            cd /root/ai-app
+
+            # 停止并删除旧容器
+            echo "🛑 停止旧容器..."
+            docker stop ai-app 2>/dev/null || true
+            docker rm ai-app 2>/dev/null || true
+
+            # 构建新镜像
+            echo "🐳 构建 Docker 镜像..."
+            docker build -t ai-app:latest .
+
+            # 启动新容器
+            echo "🐳 启动新容器..."
+            docker run -d \
+              --name ai-app \
+              --restart unless-stopped \
+              -p 3000:3000 \
+              --env-file /root/ai-app/.env \
+              -v /root/ai-app/data:/app/server/data \
+              ai-app:latest
+
+            # 清理旧镜像和构建缓存
+            echo "🧹 清理..."
+            docker image prune -f
+            docker builder prune -f
+
+            # 检查容器状态
+            echo "✅ 部署完成！"
+            docker ps --filter name=ai-app --format "容器状态: {{.Status}}"
+            echo "🌐 访问地址: http://${{ secrets.SSH_HOST }}:3000"

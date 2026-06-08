@@ -1,0 +1,149 @@
+{
+  "app": {
+    "title": "AI アシスタント",
+    "tabs": {
+      "chat": "スマート対話",
+      "rag": "ナレッジベース",
+      "agent": "エージェント",
+      "group": "グループチャット"
+    }
+  },
+  "chat": {
+    "placeholder": "何かお手伝いできることはありますか？",
+    "regenerate": "再生成",
+    "clear": "会話をクリア",
+    "share": "会話を共有",
+    "liveShare": "ライブ共有",
+    "shareNotice": "この会話はライブ共有モードになりました。新しいメッセージは共有ページに同期されます。",
+    "shareFailed": "共有に失敗しました",
+    "linkCopied": "リンクをコピーしました",
+    "shareTitle": "この会話を共有",
+    "empty": "新しい会話を始めましょう",
+    "toolbar": {
+      "tip": "Enter で送信 · Shift+Enter で改行",
+      "count": "文字"
+    }
+  },
+  "agent": {
+    "description": "エージェントは自動的にツールを使用して検索、計算、天気予報を行います",
+    "suggestionLabel": "これらのタスクを試してみてください",
+    "clear": "記録をクリア",
+    "placeholder": "タスクを説明してください。エージェントが段階的に実行します...",
+    "status": {
+      "running": "実行中",
+      "done": "完了",
+      "error": "エラー"
+    },
+    "steps": "ステップ",
+    "conclusion": "結論",
+    "suggestions": {
+      "0": "最新のAI業界ニュースを検索してください",
+      "1": "北京の今日の天気はどうですか",
+      "2": "3.14 * 25.6 の結果を計算してください",
+      "3": "2026年の端午節の休暇安排を検索してください",
+      "4": "(85 + 37) * 2.5 を計算してください",
+      "5": "上海の天気状況を確認してください"
+    }
+  },
+  "rag": {
+    "title": "ナレッジベース Q&A",
+    "description": "ドキュメントをアップロードした後、AI はドキュメントの内容に基づいて質問に回答します",
+    "upload": "ドキュメントをアップロード",
+    "search": "検索",
+    "placeholder": "ナレッジベースに基づいて質問...",
+    "empty": "ドキュメントがありません。先にアップロードしてください",
+    "clear": "ドキュメントをクリア",
+    "qaTab": "Q&A",
+    "manageTab": "ナレッジベース管理",
+    "currentStore": "現在のナレッジベース",
+    "noStores": "ナレッジベースがありません",
+    "refreshList": "リストを更新",
+    "addContent": "ナレッジベースコンテンツを追加",
+    "storeName": "ナレッジベース名",
+    "uploadFile": "ファイルをアップロード",
+    "supportPdf": "PDF 形式をサポート",
+    "processing": "処理中...",
+    "selectFile": "ファイルを選択",
+    "importFromUrl": "URL からインポート",
+    "importing": "インポート中...",
+    "import": "インポート",
+    "createdStores": "作成済みのナレッジベース",
+    "noStoresYet": "ナレッジベースがありません。先にコンテンツを追加してください",
+    "use": "使用",
+    "uploadSuccess": "ファイル",
+    "uploadedTo": "ナレッジベースに追加されました",
+    "chunks": "合計",
+    "fragments": "フラグメント",
+    "uploadFailed": "アップロードに失敗しました",
+    "urlAdded": "ウェブページがナレッジベースに追加されました"
+  },
+  "groupChat": {
+    "title": "リアルタイムグループチャット",
+    "roomManagement": "ルーム管理",
+    "newRoom": "新しいルーム名",
+    "create": "作成",
+    "rename": "名前変更",
+    "delete": "削除",
+    "noRooms": "ルームがありません",
+    "selectRoom": "チャットを開始するルームを選択してください",
+    "currentRoom": "現在のルーム",
+    "realtime": "リアルタイム接続中",
+    "polling": "ポーリングフォールバック",
+    "toolbar": {
+      "tip": "Enter で送信 · @AI あなたの質問 でAI返信を呼び出す",
+      "status": "リアルタイム"
+    },
+    "placeholder": "メッセージを入力、@AI あなたの質問...",
+    "ai": "AI",
+    "me": "私",
+    "renamePrompt": "新しいルーム名を入力"
+  },
+  "theme": {
+    "light": "ライト",
+    "dark": "ダーク",
+    "blue": "ブルー",
+    "purple": "パープル",
+    "green": "グリーン"
+  },
+  "share": {
+    "title": "会話を共有",
+    "copyLink": "リンクをコピー",
+    "close": "閉じる",
+    "description": "このリンクを他の人と共有して、会話内容を閲覧できるようにします",
+    "loadFailed": "共有データの読み込みに失敗しました",
+    "loading": "共有コンテンツを読み込み中...",
+    "unavailable": "共有が利用できません",
+    "noContent": "共有コンテンツがありません",
+    "readonly": "読み取り専用共有",
+    "createdAt": "作成日時",
+    "backHome": "ホームに戻る",
+    "readonlyNotice": "このページは共有コンテンツの閲覧専用です。編集やメッセージの送信はサポートされていません。"
+  },
+  "liveShare": {
+    "title": "ライブ共有",
+    "description": "会話をリアルタイムで共有、他の人は新しいメッセージを即座に確認できます",
+    "create": "共有を作成",
+    "stop": "共有を停止",
+    "waiting": "メッセージを待機中...",
+    "sharedBy": "共有者",
+    "linkCopied": "リンクをコピーしました",
+    "realtime": "リアルタイム接続中",
+    "polling": "ポーリングフォールバック",
+    "sameSession": "あなたと相手は同じセッションを見ています",
+    "copyLink": "ライブリンクをコピー",
+    "backHome": "ホームに戻る",
+    "liveUrl": "ライブ共有URL",
+    "toolbarTip": "ライブ共有セッション · 両者がメッセージを送信可能",
+    "placeholder": "メッセージを入力..."
+  },
+  "common": {
+    "loading": "読み込み中...",
+    "error": "エラー",
+    "retry": "再試行",
+    "cancel": "キャンセル",
+    "confirm": "確認",
+    "save": "保存",
+    "delete": "削除",
+    "edit": "編集"
+  }
+}

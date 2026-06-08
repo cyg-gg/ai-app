@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Studio</title>
+    <!-- ⚡ 阻塞式内联脚本：在 React 加载前同步读取 localStorage 设置主题，杜绝闪白 -->
+    <script>
+      (function() {
+        try {
+          var raw = localStorage.getItem('ai-app-theme-settings');
+          if (raw) {
+            var settings = JSON.parse(raw);
+            var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            var mode = settings.mode || 'system';
+
+            if (mode === 'manual-light') { document.documentElement.dataset.theme = 'light'; return }
+            if (mode === 'manual-dark')  { document.documentElement.dataset.theme = 'dark';  return }
+
+            if (mode === 'schedule' && settings.scheduleEnabled) {
+              function parseTime(v) { var m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(v || ''); return m ? { h: +m[1], n: +m[2] } : null }
+              function mins(d) { return d.getHours() * 60 + d.getMinutes() }
+              var light = parseTime(settings.lightTime);
+              var dark  = parseTime(settings.darkTime);
+              if (light && dark) {
+                var now = mins(new Date());
+                var lm = light.h * 60 + light.n;
+                var dm = dark.h * 60 + dark.n;
+                if (lm !== dm) {
+                  var isLight = lm < dm ? (now >= lm && now < dm) : (now >= lm || now < dm);
+                  document.documentElement.dataset.theme = isLight ? 'light' : 'dark';
+                  return;
+                }
+              }
+            }
+
+            document.documentElement.dataset.theme = systemDark ? 'dark' : 'light';
+          } else {
+            // 没有保存的设置 → 按系统偏好
+            document.documentElement.dataset.theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+        } catch(e) {
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

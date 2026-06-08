@@ -1,0 +1,21 @@
+.input-box {
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--panel-bg);
+}
+.input-box__toolbar { display: flex; justify-content: space-between; align-items: center; padding: 0 4px; }
+.toolbar__tip, .toolbar__count { font-size: 11px; color: var(--text-secondary); }
+.input-box__row { display: flex; align-items: flex-end; gap: 10px; background: var(--surface-2); border: 1px solid var(--border-color); border-radius: 14px; padding: 10px 12px; transition: border-color 0.2s, box-shadow 0.2s; }
+.input-box__row:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+textarea { flex: 1; background: transparent; border: none; outline: none; color: var(--text-primary); font-size: 14px; font-family: inherit; line-height: 1.6; resize: none; max-height: 200px; overflow-y: auto; }
+textarea::placeholder { color: var(--text-secondary); opacity: 0.7; }
+textarea:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-send, .btn-abort { width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s; }
+.btn-send { background: var(--accent); color: #fff; }
+.btn-send:hover:not(:disabled) { background: var(--accent-2); transform: scale(1.05); }
+.btn-send:disabled { background: var(--border-color); color: var(--text-secondary); cursor: not-allowed; }
+.btn-abort { background: color-mix(in srgb, #f87171 18%, var(--surface-2)); color: #f87171; border: 1px solid color-mix(in srgb, #f87171 55%, var(--border-color)); }
+.btn-abort:hover { background: color-mix(in srgb, #f87171 26%, var(--surface-2)); }

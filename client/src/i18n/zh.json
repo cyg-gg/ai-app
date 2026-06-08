@@ -1,0 +1,149 @@
+{
+  "app": {
+    "title": "AI 助手",
+    "tabs": {
+      "chat": "智能对话",
+      "rag": "知识库",
+      "agent": "Agent",
+      "group": "群聊"
+    }
+  },
+  "chat": {
+    "placeholder": "有什么可以帮你的？",
+    "regenerate": "重新生成",
+    "clear": "清空对话",
+    "share": "分享对话",
+    "liveShare": "实时共享",
+    "shareNotice": "当前对话已进入实时共享模式，后续消息会同步到共享页面。",
+    "shareFailed": "分享失败",
+    "linkCopied": "链接已复制",
+    "shareTitle": "分享当前对话",
+    "empty": "开始一段新的对话吧",
+    "toolbar": {
+      "tip": "Enter 发送 · Shift+Enter 换行",
+      "count": "字"
+    }
+  },
+  "agent": {
+    "description": "Agent 会自动调用工具搜索、计算、查天气",
+    "suggestionLabel": "试试这些任务",
+    "clear": "清空记录",
+    "status": {
+      "running": "执行中",
+      "done": "完成",
+      "error": "出错"
+    },
+    "steps": "步",
+    "conclusion": "结论",
+    "placeholder": "描述你的任务，Agent 会自动分步执行...",
+    "suggestions": {
+      "0": "帮我搜索一下最近的 AI 行业新闻",
+      "1": "北京今天天气怎么样",
+      "2": "计算 3.14 * 25.6 的结果",
+      "3": "搜索端午节 2026 的放假安排",
+      "4": "帮我计算 (85 + 37) * 2.5",
+      "5": "查询上海的天气情况"
+    }
+  },
+  "rag": {
+    "title": "知识库问答",
+    "description": "上传文档后，AI 将基于文档内容回答问题",
+    "upload": "上传文档",
+    "search": "搜索",
+    "placeholder": "在知识库中提问...",
+    "empty": "暂无文档，请先上传",
+    "clear": "清空文档",
+    "qaTab": "知识问答",
+    "manageTab": "知识库管理",
+    "currentStore": "当前知识库",
+    "noStores": "暂无知识库",
+    "refreshList": "刷新列表",
+    "addContent": "添加知识库内容",
+    "storeName": "知识库名称",
+    "uploadFile": "上传文件",
+    "supportPdf": "支持 PDF 格式",
+    "processing": "处理中...",
+    "selectFile": "选择文件",
+    "importFromUrl": "从网页导入",
+    "importing": "导入中...",
+    "import": "导入",
+    "createdStores": "已创建的知识库",
+    "noStoresYet": "暂无知识库，请先添加内容",
+    "use": "使用",
+    "uploadSuccess": "文件",
+    "uploadedTo": "已加入知识库",
+    "chunks": "共",
+    "fragments": "个片段",
+    "uploadFailed": "上传失败",
+    "urlAdded": "网页已加入知识库"
+  },
+  "groupChat": {
+    "title": "实时群聊",
+    "roomManagement": "房间管理",
+    "newRoom": "新建房间名",
+    "create": "创建",
+    "rename": "重命名",
+    "delete": "删除",
+    "noRooms": "暂无房间",
+    "selectRoom": "请选择一个房间开始聊天",
+    "currentRoom": "当前房间",
+    "realtime": "实时连接中",
+    "polling": "轮询降级",
+    "toolbar": {
+      "tip": "Enter 发送 · 发送 @AI 你的问题 召唤 AI 回复",
+      "status": "实时"
+    },
+    "placeholder": "输入消息，@AI 你的问题...",
+    "ai": "AI",
+    "me": "我",
+    "renamePrompt": "输入新房间名"
+  },
+  "theme": {
+    "light": "浅色",
+    "dark": "深色",
+    "blue": "蓝色",
+    "purple": "紫色",
+    "green": "绿色"
+  },
+  "share": {
+    "title": "分享对话",
+    "copyLink": "复制链接",
+    "close": "关闭",
+    "description": "分享此链接给他人，他们可以查看对话内容",
+    "loadFailed": "分享数据加载失败",
+    "loading": "加载分享内容中...",
+    "unavailable": "分享不可用",
+    "noContent": "暂无分享内容",
+    "readonly": "只读分享",
+    "createdAt": "创建于",
+    "backHome": "返回首页",
+    "readonlyNotice": "该页面仅用于查看分享内容，不支持编辑或继续发送消息。"
+  },
+  "liveShare": {
+    "title": "实时共享",
+    "description": "实时共享当前对话，其他人可以同步看到新消息",
+    "create": "创建共享",
+    "stop": "停止共享",
+    "waiting": "等待消息...",
+    "sharedBy": "共享者",
+    "linkCopied": "链接已复制",
+    "realtime": "实时连接中",
+    "polling": "轮询降级",
+    "sameSession": "你和对方看到的是同一个会话",
+    "copyLink": "复制实时链接",
+    "backHome": "返回首页",
+    "liveUrl": "实时共享链接",
+    "toolbarTip": "实时共享会话 · 双方都可发消息",
+    "placeholder": "输入消息..."
+  },
+  "common": {
+    "loading": "加载中...",
+    "error": "错误",
+    "retry": "重试",
+    "cancel": "取消",
+    "confirm": "确认",
+    "save": "保存",
+    "delete": "删除",
+    "edit": "编辑"
+  }
+}

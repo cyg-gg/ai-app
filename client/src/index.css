@@ -1,0 +1,57 @@
+/* ── 主题变量 ── */
+:root {
+  --bg: #0f0f13;
+  --panel-bg: #13131e;
+  --surface-2: #1a1a24;
+  --border-color: #2a2a3a;
+  --text-primary: #e2e2e8;
+  --text-secondary: #666;
+  --accent: #6366f1;
+  --accent-2: #a78bfa;
+}
+
+:root[data-theme='light'] {
+  --bg: #f4f6fb;
+  --panel-bg: #ffffff;
+  --surface-2: #eef1f8;
+  --border-color: #d7dceb;
+  --text-primary: #1f2430;
+  --text-secondary: #667085;
+  --accent: #4f46e5;
+  --accent-2: #7c3aed;
+}
+
+/* ── 主题切换过渡动画 ──
+   使用 .theme-safe 避免页面加载时的过渡闪烁：
+   页面首次加载时没有 .theme-safe，所有过渡不生效；
+   主题切换时 js 会添加 .theme-safe，过渡生效。     */
+.theme-safe *,
+.theme-safe *::before,
+.theme-safe *::after {
+  transition: background 0.25s ease,
+              background-color 0.25s ease,
+              border-color 0.25s ease,
+              color 0.2s ease,
+              box-shadow 0.25s ease !important;
+}
+
+/* ── 基础重置 ── */
+* {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+button, input, textarea {
+  font: inherit;
+}
