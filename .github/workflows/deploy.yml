@@ -14,14 +14,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 检出代码
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. 配置 SSH、传输代码并部署
       - name: Deploy to ECS
         run: |
-          # 配置 SSH
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY_B64 }}" | base64 -d > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
@@ -33,11 +30,9 @@ jobs:
           SSH_HOST=${{ secrets.SSH_HOST }}
           SSH_PORT=${{ secrets.SSH_PORT || '22' }}
 
-          # 测试 SSH 连接
           echo "测试 SSH 连接..."
           ssh -i $SSH_KEY -p $SSH_PORT $SSH_USER@$SSH_HOST "echo SSH连接成功"
 
-          # 打包代码
           echo "打包代码..."
           tar -czf /tmp/ai-app.tar.gz \
             --exclude='.git' \
@@ -47,51 +42,31 @@ jobs:
             --exclude='server/data' \
             .
 
-          # 传输到 ECS
           echo "传输代码到 ECS..."
           scp -i $SSH_KEY -P $SSH_PORT /tmp/ai-app.tar.gz $SSH_USER@$SSH_HOST:/root/ai-app.tar.gz
 
-          # 在 ECS 上执行部署
           echo "在 ECS 上执行部署..."
-          ssh -i $SSH_KEY -p $SSH_PORT $SSH_USER@$SSH_HOST << 'ENDSCRIPT'
-            set -e
-            echo "开始部署 AI Studio..."
-
-            # 解压代码
-            echo "解压代码..."
-            rm -rf /root/ai-app
-            mkdir -p /root/ai-app
-            tar -xzf /root/ai-app.tar.gz -C /root/ai-app
-            rm -f /root/ai-app.tar.gz
-            cd /root/ai-app
-
-            # 停止并删除旧容器
-            echo "停止旧容器..."
-            docker stop ai-app 2>/dev/null || true
-            docker rm ai-app 2>/dev/null || true
-
-            # 构建新镜像
-            echo "构建 Docker 镜像..."
-            docker build -t ai-app:latest .
-
-            # 启动新容器
-            echo "启动新容器..."
-            docker run -d \
-              --name ai-app \
-              --restart unless-stopped \
-              -p 3000:3000 \
-              --env-file /root/ai-app/.env \
-              -v /root/ai-app/data:/app/server/data \
-              ai-app:latest
-
-            # 清理
-            echo "清理..."
-            docker image prune -f
-            docker builder prune -f
-
-            # 检查状态
-            echo "部署完成！"
-            docker ps --filter name=ai-app --format "容器状态: {{.Status}}"
-          ENDSCRIPT
+          ssh -i $SSH_KEY -p $SSH_PORT $SSH_USER@$SSH_HOST "bash -s" << 'ENDSCRIPT'
+set -e
+echo "开始部署 AI Studio..."
+echo "解压代码..."
+rm -rf /root/ai-app
+mkdir -p /root/ai-app
+tar -xzf /root/ai-app.tar.gz -C /root/ai-app
+rm -f /root/ai-app.tar.gz
+cd /root/ai-app
+echo "停止旧容器..."
+docker stop ai-app 2>/dev/null || true
+docker rm ai-app 2>/dev/null || true
+echo "构建 Docker 镜像..."
+docker build -t ai-app:latest .
+echo "启动新容器..."
+docker run -d --name ai-app --restart unless-stopped -p 3000:3000 --env-file /root/ai-app/.env -v /root/ai-app/data:/app/server/data ai-app:latest
+echo "清理..."
+docker image prune -f
+docker builder prune -f
+echo "部署完成！"
+docker ps --filter name=ai-app --format "容器状态: {{.Status}}"
+ENDSCRIPT
 
           echo "部署完成！访问地址: http://${{ secrets.SSH_HOST }}:3000"
