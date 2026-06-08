@@ -20,7 +20,6 @@ client/dist/
 
 # 开发配置文件
 **/*.md
-**/Dockerfile
 **/docker-compose*
 **/.dockerignore
 
