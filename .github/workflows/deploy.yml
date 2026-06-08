@@ -3,7 +3,6 @@
 #
 # 触发条件：推送 main 分支
 # 流程：代码传到 ECS → 直接在服务器上构建镜像 → 重启容器
-# 配置完成时间：2026-06-08
 # ============================================================
 
 name: Deploy to Alibaba Cloud ECS
@@ -22,24 +21,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. 将代码通过 rsync 传到 ECS
-      - name: Sync code to ECS
-        uses: easingthemes/ssh-deploy@main
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          REMOTE_HOST: ${{ secrets.SSH_HOST }}
-          REMOTE_USER: ${{ secrets.SSH_USERNAME }}
-          REMOTE_PORT: ${{ secrets.SSH_PORT || '22' }}
-          SOURCE: .
-          TARGET: /root/ai-app
-          EXCLUDE: |
-            .git/
-            **/node_modules/
-            **/dist/
-            .env
-            server/data/
+      # 2. 打包代码并传输到 ECS
+      - name: Transfer code to ECS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          source: "."
+          target: "/root/ai-app-tmp"
+          strip_components: 0
+          rm: true
+          debug: true
 
-      # 3. SSH 登录 ECS，构建 Docker 镜像并启动容器
+      # 3. SSH 登录 ECS，移动代码、构建 Docker 镜像并启动容器
       - name: Build and run Docker on ECS
         uses: appleboy/ssh-action@v1.1.0
         with:
@@ -51,6 +47,11 @@ jobs:
             set -e
 
             echo "🚀 开始部署 AI Studio..."
+
+            # 移动代码到目标目录
+            echo "📦 移动代码..."
+            rm -rf /root/ai-app
+            mv /root/ai-app-tmp /root/ai-app
             cd /root/ai-app
 
             # 停止并删除旧容器
