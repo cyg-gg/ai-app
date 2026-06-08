@@ -1,7 +1,6 @@
 # ============================================================
 # GitHub Actions — 自动构建 Docker 镜像并部署到阿里云 ECS
-# 策略：CI 构建 → docker save → rsync(over SSH) 传输到 ECS → docker load 启动
-# 注意：全程只用 ssh/rsync 原生命令，不使用 appleboy/scp-action
+# 策略：CI 构建 → docker save → GitHub Artifact 中转 → SSH 下载 → docker load 启动
 # ============================================================
 
 name: Deploy to Alibaba Cloud ECS
@@ -11,20 +10,17 @@ on:
     branches: [main]
 
 jobs:
-  deploy:
-    name: Build & Deploy
+  build:
+    name: Build Image
     runs-on: ubuntu-latest
 
     steps:
-      # ── 1. 检出代码 ──────────────────────────────────────────
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ── 2. 设置 Docker Buildx ────────────────────────────────
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # ── 3. 缓存 Docker 层 ────────────────────────────────────
       - name: Cache Docker layers
         uses: actions/cache@v4
         with:
@@ -33,7 +29,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildx-
 
-      # ── 4. 构建镜像（在 CI 机器上）───────────────────────────
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
@@ -47,79 +42,91 @@ jobs:
       - name: Move cache
         run: rm -rf /tmp/.buildx-cache && mv /tmp/.buildx-cache-new /tmp/.buildx-cache
 
-      # ── 5. 导出镜像 + 准备 .env 文件 ───────────────────────
-      - name: Export and prepare files
+      - name: Export image to tar
         run: |
           docker save ai-app:latest | gzip > /tmp/ai-app.tar.gz
-          echo "IMAGE_SIZE=$(du -sh /tmp/ai-app.tar.gz | cut -f1)" >> $GITHUB_STEP_SUMMARY
-          echo "${{ secrets.APP_ENV }}" > /tmp/app.env
-          echo ".env 文件已准备好"
+          echo "IMAGE_SIZE=$(du -sh /tmp/ai-app.tar.gz | cut -f1)"
 
-      # ── 6. 全部部署操作（SSH 原生命令）──────────────────────
-      - name: Full Deploy via SSH
-        env:
-          HOST: ${{ secrets.SSH_HOST }}
-          PORT: ${{ secrets.SSH_PORT || '22' }}
-          USER: ${{ secrets.SSH_USERNAME }}
-          PRIV_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp/ai-app.tar.gz
+          retention-days: 1
+
+  deploy:
+    name: Deploy to ECS
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
+          path: /tmp
+
+      # 把 .env 写入本地文件（避免通过 SSH 参数传递）
+      - name: Prepare .env file
         run: |
-          set -e
+          cat > /tmp/app.env << 'EOF'
+          ${{ secrets.APP_ENV }}
+          EOF
 
-          # ---- 写入 SSH 私钥 ----
-          mkdir -p ~/.ssh
-          echo "$PRIV_KEY" | tr -d '\r' > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          export SSH_CMD="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p $PORT -i ~/.ssh/deploy_key"
+      # 用 appleboy/ssh-action 在 ECS 上执行命令
+      # 同时用 appleboy/scp-action 传输文件（这次用相对路径）
+      - name: Upload files to ECS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          source: "/tmp/ai-app.tar.gz,/tmp/app.env"
+          target: "/root/deploy/"
+          overwrite: true
 
-          echo "========================================"
-          echo "  开始部署 AI App — $(date '+%Y-%m-%d %H:%M:%S')"
-          echo "========================================"
-
-          # ---- 步骤A：创建目录 ----
-          echo "[1/4] 创建目录..."
-          $SSH_CMD $USER@$HOST 'mkdir -p /root/deploy/data /root/deploy/uploads'
-
-          # ---- 步骤B：传输 .env 文件 ----
-          echo "[2/4] 传输 .env..."
-          scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-            -P $PORT -i ~/.ssh/deploy_key \
-            /tmp/app.env $USER@$HOST:/root/deploy/.env
-
-          # ---- 步骤C：传输镜像 tar ----
-          echo "[3/4] 传输镜像 (rsync)..."
-          rsync -avz \
-            -e "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -p $PORT -i ~/.ssh/deploy_key" \
-            /tmp/ai-app.tar.gz $USER@$HOST:/root/deploy/ai-app.tar.gz
-
-          # ---- 步骤D：加载镜像并启动容器 ----
-          echo "[4/4] 加载镜像并部署容器..."
-          $SSH_CMD $USER@$HOST '
+      - name: Deploy on ECS
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          command_timeout: 10m
+          script: |
             set -e
-            docker load < /root/deploy/ai-app.tar.gz && rm -f /root/deploy/ai-app.tar.gz
+
+            echo "========================================"
+            echo "  开始部署 AI App"
+            echo "========================================"
+
+            mkdir -p /root/deploy/data /root/deploy/uploads
+
+            echo "📦 加载 Docker 镜像..."
+            docker load < /root/deploy/ai-app.tar.gz
+            rm -f /root/deploy/ai-app.tar.gz
+
+            echo "🛑 停止旧容器..."
             docker stop ai-app 2>/dev/null || true
-            docker rm   ai-app 2>/dev/null || true
-            docker run -d \
-              --name ai-app \
-              --restart unless-stopped \
-              -p 3000:3000 \
-              --env-file /root/deploy/.env \
+            docker rm ai-app 2>/dev/null || true
+
+            echo "🚀 启动新容器..."
+            docker run -d --name ai-app --restart unless-stopped \
+              -p 3000:3000 --env-file /root/deploy/app.env \
               -v /root/deploy/data:/app/server/data \
               -v /root/deploy/uploads:/app/server/uploads \
               ai-app:latest
+
             docker image prune -f
+
+            echo "⏳ 等待服务就绪..."
             sleep 5
-            for i in 1 2 3 4 5; do
-              STATUS=$(curl -sf http://localhost:3000/health 2>/dev/null | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get(\"status\",\"pending\"))" 2>/dev/null || echo "pending")
-              if [ "$STATUS" = "ok" ]; then echo "✅ 健康检查通过！"; break; fi
-              sleep 3
+            for i in $(seq 1 5); do
+              if curl -sf http://localhost:3000/health >/dev/null 2>&1; then
+                echo "✅ 服务已就绪"; break
+              fi; sleep 3
             done
-            docker ps --filter name=ai-app --format "{{.Names}} | {{.Status}} | {{.Ports}}"
-          '
 
-          # ---- 清理私钥 ----
-          rm -f ~/.ssh/deploy_key
-
-          echo "========================================"
-          echo "  部署完成！"
-          echo "  访问地址: http://${HOST}:3000"
-          echo "========================================"
+            docker ps --filter name=ai-app
+            echo "🎉 部署完成 http://${{ secrets.SSH_HOST }}:3000"
