@@ -1,6 +1,6 @@
 # ============================================================
 # GitHub Actions — 自动构建 Docker 镜像并部署到阿里云 ECS
-# 策略：CI 构建 → docker save → GitHub Artifact 中转 → SSH 下载 → docker load 启动
+# 策略：CI 构建 → GitHub Artifact 中转 → 原生 scp 命令传输 → SSH 部署
 # ============================================================
 
 name: Deploy to Alibaba Cloud ECS
@@ -64,39 +64,41 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: docker-image
-          path: /tmp
+          path: ./deploy-artifact
 
-      # 把 .env 写入本地文件（避免通过 SSH 参数传递）
-      - name: Prepare .env file
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          cat >> ~/.ssh/config <<EOF
+          Host ecs
+            HostName ${{ secrets.SSH_HOST }}
+            User ${{ secrets.SSH_USERNAME }}
+            Port ${{ secrets.SSH_PORT || '22' }}
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking no
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Upload .env to ECS
         run: |
           cat > /tmp/app.env << 'EOF'
           ${{ secrets.APP_ENV }}
           EOF
+          scp /tmp/app.env ecs:/root/deploy/app.env
 
-      # 用 appleboy/ssh-action 在 ECS 上执行命令
-      # 同时用 appleboy/scp-action 传输文件（这次用相对路径）
-      - name: Upload files to ECS
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || '22' }}
-          source: "/tmp/ai-app.tar.gz,/tmp/app.env"
-          target: "/root/deploy/"
-          overwrite: true
+      - name: Upload image to ECS (split transfer)
+        run: |
+          # 分片传输大文件，避免 scp 超时
+          split -b 50M ./deploy-artifact/ai-app.tar.gz /tmp/ai-app.part-
+          scp /tmp/ai-app.part-* ecs:/root/deploy/
+          ssh ecs "cat /root/deploy/ai-app.part-* > /root/deploy/ai-app.tar.gz && rm /root/deploy/ai-app.part-*"
 
       - name: Deploy on ECS
-        uses: appleboy/ssh-action@v1.1.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || '22' }}
-          command_timeout: 10m
-          script: |
+        run: |
+          ssh ecs '
             set -e
-
             echo "========================================"
             echo "  开始部署 AI App"
             echo "========================================"
@@ -130,3 +132,4 @@ jobs:
 
             docker ps --filter name=ai-app
             echo "🎉 部署完成 http://${{ secrets.SSH_HOST }}:3000"
+          '
