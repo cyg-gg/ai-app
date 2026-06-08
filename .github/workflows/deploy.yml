@@ -65,7 +65,7 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           source: /tmp/ai-app.tar.gz
           target: /root/deploy/
-          strip_components: 2
+          overwrite: true
 
       # ── 7. 上传 .env 环境变量文件到 ECS ─────────────────────
       #    （首次部署后 .env 不会变动，此步骤幂等）
