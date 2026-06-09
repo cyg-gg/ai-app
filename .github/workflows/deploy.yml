@@ -10,11 +10,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 检出代码
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. 配置 SSH
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
@@ -22,7 +20,6 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
 
-      # 3. 打包代码
       - name: Package code
         run: |
           tar -czf /tmp/ai-app.tar.gz \
@@ -30,40 +27,68 @@ jobs:
             --exclude='node_modules' \
             --exclude='dist' \
             --exclude='server/data' \
+            --exclude='server/.env' \
+            --exclude='client/.env' \
             .
           ls -lh /tmp/ai-app.tar.gz
 
-      # 4. 传输代码到 ECS
       - name: Transfer code to ECS
         run: |
           scp -i ~/.ssh/id_ed25519 -P ${{ secrets.SSH_PORT || '22' }} /tmp/ai-app.tar.gz ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }}:/root/ai-app.tar.gz
 
-      # 5. 在 ECS 上执行部署
+      - name: Create .env on ECS
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.SSH_PORT || '22' }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} "cat > /root/ai-app.env << 'ENVEOF'
+OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+OPENAI_BASE_URL=${{ secrets.OPENAI_BASE_URL }}
+OPENAI_MODEL=${{ secrets.OPENAI_MODEL }}
+PORT=3000
+NODE_ENV=production
+ENVEOF"
+
       - name: Deploy on ECS
         run: |
-          ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.SSH_PORT || '22' }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} 'bash -s' << 'ENDOFSCRIPT'
+          ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.SSH_PORT || '22' }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} 'bash -s' << 'ENDSCRIPT'
 set -e
-echo "开始部署 AI Studio..."
+echo "=========================================="
+echo "  开始部署 AI Studio"
+echo "=========================================="
+
 echo "解压代码..."
 rm -rf /root/ai-app
 mkdir -p /root/ai-app
 tar -xzf /root/ai-app.tar.gz -C /root/ai-app
 rm -f /root/ai-app.tar.gz
+
+echo "复制环境变量..."
+cp /root/ai-app.env /root/ai-app/server/.env
+
 cd /root/ai-app
+
 echo "停止旧容器..."
 docker stop ai-app 2>/dev/null || true
 docker rm ai-app 2>/dev/null || true
+
 echo "构建 Docker 镜像..."
 docker build -t ai-app:latest .
+
 echo "启动新容器..."
-docker run -d --name ai-app --restart unless-stopped -p 3000:3000 --env-file /root/ai-app/.env -v /root/ai-app/data:/app/server/data ai-app:latest
-echo "清理..."
+docker run -d \
+  --name ai-app \
+  --restart unless-stopped \
+  -p 3000:3000 \
+  -v /root/ai-app/data:/app/server/data \
+  ai-app:latest
+
+echo "清理旧镜像..."
 docker image prune -f
 docker builder prune -f
-echo "部署完成！"
-docker ps --filter name=ai-app --format "容器状态: {{.Status}}"
-ENDOFSCRIPT
 
-      # 6. 输出访问地址
+echo "=========================================="
+echo "  部署完成！"
+echo "=========================================="
+docker ps --filter name=ai-app --format "容器状态: {{.Status}}"
+ENDSCRIPT
+
       - name: Show access URL
         run: echo "部署完成！访问地址: http://${{ secrets.SSH_HOST }}:3000"
