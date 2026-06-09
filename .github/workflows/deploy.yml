@@ -38,51 +38,31 @@ jobs:
 
       - name: Deploy on ECS
         run: |
-          ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.SSH_PORT || '22' }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} 'bash -s' << 'ENDSCRIPT'
+          ssh -i ~/.ssh/id_ed25519 -p ${{ secrets.SSH_PORT || '22' }} ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} "bash -s" << 'ENDSCRIPT'
 set -e
-echo "=========================================="
-echo "  开始部署 AI Studio"
-echo "=========================================="
-
-echo "解压代码..."
+echo "开始部署 AI Studio..."
 rm -rf /root/ai-app
 mkdir -p /root/ai-app
 tar -xzf /tmp/ai-app.tar.gz -C /root/ai-app
 rm -f /tmp/ai-app.tar.gz
-
-echo "写入环境变量..."
-cat > /root/ai-app/server/.env << EOF
-OPENAI_API_KEY=sk-4OaUm1POrOE7ZYSV1R1rI6MqWKhzUxMl
-OPENAI_BASE_URL=https://token.sensenova.cn/v1
-OPENAI_MODEL=deepseek-v4-flash
-PORT=3000
-NODE_ENV=production
-EOF
-
 cd /root/ai-app
-
+echo "写入环境变量..."
+echo "OPENAI_API_KEY=sk-4OaUm1POrOE7ZYSV1R1rI6MqWKhzUxMl" > /root/ai-app/server/.env
+echo "OPENAI_BASE_URL=https://token.sensenova.cn/v1" >> /root/ai-app/server/.env
+echo "OPENAI_MODEL=deepseek-v4-flash" >> /root/ai-app/server/.env
+echo "PORT=3000" >> /root/ai-app/server/.env
+echo "NODE_ENV=production" >> /root/ai-app/server/.env
 echo "停止旧容器..."
 docker stop ai-app 2>/dev/null || true
 docker rm ai-app 2>/dev/null || true
-
 echo "构建 Docker 镜像..."
 docker build -t ai-app:latest .
-
 echo "启动新容器..."
-docker run -d \
-  --name ai-app \
-  --restart unless-stopped \
-  -p 3000:3000 \
-  -v /root/ai-app/data:/app/server/data \
-  ai-app:latest
-
+docker run -d --name ai-app --restart unless-stopped -p 3000:3000 -v /root/ai-app/data:/app/server/data ai-app:latest
 echo "清理旧镜像..."
 docker image prune -f
 docker builder prune -f
-
-echo "=========================================="
-echo "  部署完成！"
-echo "=========================================="
+echo "部署完成！"
 docker ps --filter name=ai-app --format "容器状态: {{.Status}}"
 ENDSCRIPT
 
